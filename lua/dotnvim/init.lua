@@ -5,17 +5,21 @@ local config = {
   project_configs_parent_dir = "~/.config/dotnvim"
 }
 
-local function module_name(parent_dir)
-  local file_path = Path:new(parent_dir .. "/module_name")
+local scan_args = { 
+  add_dirs = true,
+  only_dirs = true,
+  depth = 1,
+}
 
-  if file_path:exists() then 
-    print(file_path.filename .. " exists!")
-    local io = require("io")
-    local name_file = io.open(file_path.filename, "r")
-    local name = name_file:read("*l")
-    name_file:close()
-    return name
+local function module_name(parent_dir)
+  local mod_full_path = scan_dir(parent_dir, scan_args)[1]
+  if not mod_full_path then
+    return nil
   end
+
+  local mod_name_parts = vim.split(mod_full_path, "/")
+  local mod_name = mod_name_parts[#mod_name_parts]
+  return mod_name
 end
 
 local function load_config_from_parent_dir_if_exists(cwd, parent_dir)
@@ -26,11 +30,7 @@ local function load_config_from_parent_dir_if_exists(cwd, parent_dir)
   end
 
   if p:is_dir() then
-    local configured_projects = scan_dir(p.filename, { 
-      add_dirs = true,
-      only_dirs = true,
-      depth = 1,
-    })
+    local configured_projects = scan_dir(p.filename, scan_args)
 
     for index = #paths, 1, -1 do
       local file_path_part = paths[index]
@@ -38,22 +38,31 @@ local function load_config_from_parent_dir_if_exists(cwd, parent_dir)
         local project_config_parts = vim.split(project_config_dir, "/")
         local project_config = project_config_parts[#project_config_parts]
         if file_path_part == project_config then
+
           local project_config_dir = parent_dir .. "/" .. project_config
-          local root_init_lua = Path:new(project_config_dir .. "/init.lua")
-          if root_init_lua:exists() and root_init_lua:is_file() then
+          local root_init_lua = Path.new(project_config_dir .. "/init.lua")
+          if root_init_lua:is_file() then
             dofile(root_init_lua.filename)
             return true
           end
 
-          local mod_name = module_name(project_config_dir) or project_config
-          local mod_path = Path:new(project_config_dir .. "/lua")
-          if mod_path:exists() and mod_path:is_dir() then
-            local init_path = mod_path .. "/?/init.lua"
-            local files_path = mod_path .. "/?.lua"
+          local lua_path = Path:new(project_config_dir .. "/lua")
+          if lua_path:is_dir() then
+            local init_path = lua_path .. "/?/init.lua"
+            local files_path = lua_path .. "/?.lua"
+
+            local mod_name = module_name(lua_path.filename)
+
+            if not mod_name then
+              vim.notify("No module located in " .. lua_path.filename, "ERROR", { title = "dotnvim"})
+              return false
+            end
+
             package.path = package.path .. ";" .. init_path .. ";" .. files_path
             require(mod_name)
             return true
           end
+          vim.notify("Configuration directory present for " .. project_config .. " but it does not contain an init.lua or lua module", "WARN", { title = "dotnvim"})
         end
       end
     end
@@ -69,7 +78,8 @@ local function load_config_from_file_path_if_exists(cwd)
   local s = "/"
 
   for _=1,#paths do
-    local str_path = s .. table.concat(paths, s) .. "/.nvim" 
+    local parent_path =  s .. table.concat(paths, s)
+    local str_path = parent_path .. "/.nvim" 
     local p = Path:new(str_path)
 
     if p:exists() then
@@ -82,12 +92,18 @@ local function load_config_from_file_path_if_exists(cwd)
         if directory:exists() and directory:is_dir() then
           local init_path = directory.filename .. "/?/init.lua"
           local files_path = directory.filename .. "/?.lua"
-          local mod_name = module_name(p.filename) or paths[#paths]
+          local mod_name = module_name(directory.filename) 
+          if not mod_name then
+              vim.notify("No module located in " .. directory.filename, "ERROR", { title = "dotnvim"})
+              return false
+          end
           package.path = package.path .. ";" .. files_path .. ";" .. init_path
           require(mod_name)
           return true
         end
       end
+
+      vim.notify(".nvim present for " .. parent_path .. " but is not a file or directory containing a lua module", "WARN", { title = "dotnvim"})
     end
 
     table.remove(paths)

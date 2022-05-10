@@ -42,22 +42,7 @@ If you need something a bit more complex, you can create a lua module inside of 
         ├── init.lua
         └── other.lua
 ```
-If you have more than one module directory under `.nvim/lua`, you will need to disambiguate the lua module by creating a `module_name` file at the root of the `.nvim` directory containing the name of the module you want to load:
 
-```bash
-.nvim
-├── module_name
-└── lua
-    ├── module_one
-    │   └── init.lua
-    └── module_two
-        └── init.lua
-```
-
-```bash
-$ cat .nvim/module_name
-module_one
-```
 #### In a config directory
 In your `project_configs_parent_dir`, create a folder that matches the folder name of the project you want to source configurations for. For example, if I had a project at `~/Projects/web/my-cool-spa`, you would create a folder in `~/.config/dotnvim/my-cool-spa` (assuming you leave the default configuration directory).
 
@@ -76,8 +61,6 @@ project_configuration_parent_dir
             ├── init.lua
             └── other.lua
 ```
-
-If you have more than one module directory under `.nvim/lua`, you will need to disambiguate the lua module by creating a `module_name` file at the root of the `project_name` directory.
 
 ### Security
 This plugin loads arbitrary code to be executed. Be mindful of what you are cloning and loading. At some point I may add some security features to allow users to preview what is  attempting to be loaded before doing so, but this is not currently a priority for me since the usage is targeted at my needs.
